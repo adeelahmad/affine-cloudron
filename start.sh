@@ -6,8 +6,9 @@ APP_DATA_DIR=${APP_DATA_DIR:-/app/data}
 APP_RUNTIME_DIR=${APP_RUNTIME_DIR:-/run/affine}
 APP_TMP_DIR=${APP_TMP_DIR:-/tmp/data}
 APP_BUILD_DIR=${APP_BUILD_DIR:-/app/code/affine}
-AFFINE_HOME=/home/cloudron/.affine
-export APP_CODE_DIR APP_DATA_DIR APP_RUNTIME_DIR APP_TMP_DIR APP_BUILD_DIR
+APP_HOME_DIR=${APP_HOME_DIR:-/app/data/home}
+AFFINE_HOME=${AFFINE_HOME:-$APP_HOME_DIR/.affine}
+export APP_CODE_DIR APP_DATA_DIR APP_RUNTIME_DIR APP_TMP_DIR APP_BUILD_DIR APP_HOME_DIR AFFINE_HOME
 
 log() {
   printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
@@ -23,7 +24,7 @@ require_env() {
 
 prepare_data_dirs() {
   log "Preparing persistent directories"
-  mkdir -p "$APP_DATA_DIR/config" "$APP_DATA_DIR/storage" "$APP_DATA_DIR/logs" "$APP_RUNTIME_DIR" "$AFFINE_HOME"
+  mkdir -p "$APP_DATA_DIR/config" "$APP_DATA_DIR/storage" "$APP_DATA_DIR/logs" "$APP_RUNTIME_DIR" "$APP_HOME_DIR" "$AFFINE_HOME"
 
   if [ ! -f "$APP_DATA_DIR/config/config.json" ]; then
     log "Seeding default configuration"
@@ -42,7 +43,7 @@ prepare_data_dirs() {
   ln -sf "$APP_DATA_DIR/config" "$AFFINE_HOME/config"
   ln -sf "$APP_DATA_DIR/storage" "$AFFINE_HOME/storage"
 
-  chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_RUNTIME_DIR" /home/cloudron
+  chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_HOME_DIR"
 }
 
 configure_database() {
@@ -140,10 +141,6 @@ PY
   fi
 }
 
-finalize_permissions() {
-  chown -R cloudron:cloudron "$APP_DATA_DIR"
-}
-
 update_server_config() {
   python3 - <<'PY'
 import json
@@ -164,7 +161,7 @@ PY
 }
 
 main() {
-  export HOME=/home/cloudron
+  export HOME="$APP_HOME_DIR"
   prepare_data_dirs
   configure_database
   configure_redis
@@ -172,7 +169,7 @@ main() {
   configure_server_metadata
   update_server_config
   configure_auth
-  finalize_permissions
+  chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_HOME_DIR"
   log "Starting supervisor"
   exec /usr/bin/supervisord -c "$APP_CODE_DIR/supervisord.conf"
 }
