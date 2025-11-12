@@ -147,7 +147,7 @@ write_runtime_env() {
   )
   local var value
   for var in "${vars[@]}"; do
-    value="${!var-}"
+    value=$(printenv "$var" 2>/dev/null || true)
     if [ -n "$value" ]; then
       printf '%s=%q\n' "$var" "$value" >> "$ENV_EXPORT_FILE"
     fi
