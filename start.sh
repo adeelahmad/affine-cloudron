@@ -64,7 +64,7 @@ configure_database() {
     db_url="postgresql://${db_url#postgres://}"
   fi
   export DATABASE_URL="$db_url"
-  record_env_var DATABASE_URL "$DATABASE_URL"
+  record_env_var DATABASE_URL "$db_url"
   log "Configured PostgreSQL endpoint"
 }
 
@@ -94,13 +94,13 @@ PY
   export REDIS_SERVER_USERNAME="$username"
   export REDIS_URL="$CLOUDRON_REDIS_URL"
   export REDIS_SERVER_URL="$CLOUDRON_REDIS_URL"
-  record_env_var REDIS_SERVER_HOST "$REDIS_SERVER_HOST"
-  record_env_var REDIS_SERVER_PORT "$REDIS_SERVER_PORT"
-  record_env_var REDIS_SERVER_PASSWORD "$REDIS_SERVER_PASSWORD"
-  record_env_var REDIS_SERVER_DATABASE "$REDIS_SERVER_DATABASE"
-  record_env_var REDIS_SERVER_USERNAME "$REDIS_SERVER_USERNAME"
-  record_env_var REDIS_URL "$REDIS_URL"
-  record_env_var REDIS_SERVER_URL "$REDIS_SERVER_URL"
+  record_env_var REDIS_SERVER_HOST "$host"
+  record_env_var REDIS_SERVER_PORT "$port"
+  record_env_var REDIS_SERVER_PASSWORD "$password"
+  record_env_var REDIS_SERVER_DATABASE "$db"
+  record_env_var REDIS_SERVER_USERNAME "$username"
+  record_env_var REDIS_URL "$CLOUDRON_REDIS_URL"
+  record_env_var REDIS_SERVER_URL "$CLOUDRON_REDIS_URL"
   log "Configured Redis endpoint"
 }
 
