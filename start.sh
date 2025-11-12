@@ -71,13 +71,16 @@ host = parsed.hostname or 'localhost'
 port = parsed.port or 6379
 password = parsed.password or ''
 db = (parsed.path or '/0').lstrip('/') or '0'
-print(f"{host}\n{port}\n{password}\n{db}")
+username = parsed.username or ''
+print(f"{host}\n{port}\n{password}\n{db}\n{username}")
 PY
 )
-  IFS=$'\n' read -r host port password db <<<"$redis_info"
+  IFS=$'\n' read -r host port password db username <<<"$redis_info"
   export REDIS_SERVER_HOST="$host"
   export REDIS_SERVER_PORT="$port"
   export REDIS_SERVER_PASSWORD="$password"
+  export REDIS_SERVER_DATABASE="$db"
+  export REDIS_SERVER_USERNAME="$username"
   export REDIS_URL="$CLOUDRON_REDIS_URL"
   export REDIS_SERVER_URL="$CLOUDRON_REDIS_URL"
   log "Configured Redis endpoint"
