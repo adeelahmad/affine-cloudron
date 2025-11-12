@@ -75,14 +75,26 @@ configure_redis() {
 import os
 from urllib.parse import urlparse
 url = os.environ.get('CLOUDRON_REDIS_URL')
-if not url:
-    raise SystemExit('redis url missing')
-parsed = urlparse(url)
-host = parsed.hostname or 'localhost'
-port = parsed.port or 6379
-password = parsed.password or ''
-db = (parsed.path or '/0').lstrip('/') or '0'
-username = parsed.username or ''
+parsed = urlparse(url) if url else None
+host = os.environ.get('CLOUDRON_REDIS_HOST')
+port = os.environ.get('CLOUDRON_REDIS_PORT')
+password = os.environ.get('CLOUDRON_REDIS_PASSWORD')
+username = os.environ.get('CLOUDRON_REDIS_USERNAME')
+db = os.environ.get('CLOUDRON_REDIS_DB')
+if not host and parsed:
+    host = parsed.hostname or 'localhost'
+if not port and parsed:
+    port = parsed.port or 6379
+if not password and parsed:
+    password = parsed.password or ''
+if not db and parsed:
+    db = (parsed.path or '/0').lstrip('/') or '0'
+if username is None:
+    username = parsed.username if parsed and parsed.username else 'default'
+host = host or 'localhost'
+port = port or 6379
+password = password or ''
+db = db or '0'
 print(f"{host}\n{port}\n{password}\n{db}\n{username}")
 PY
 )
