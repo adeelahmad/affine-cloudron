@@ -15,6 +15,14 @@ log() {
   printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
 }
 
+record_env_var() {
+  local name="$1"
+  local value="$2"
+  if [ -n "$value" ]; then
+    printf '%s=%q\n' "$name" "$value" >> "$ENV_EXPORT_FILE"
+  fi
+}
+
 require_env() {
   local var_name="$1"
   if [ -z "${!var_name:-}" ]; then
@@ -27,6 +35,7 @@ prepare_data_dirs() {
   log "Preparing persistent directories"
   mkdir -p "$APP_DATA_DIR/config" "$APP_DATA_DIR/storage" "$APP_DATA_DIR/logs" "$APP_RUNTIME_DIR" "$APP_HOME_DIR" "$AFFINE_HOME"
   mkdir -p /run/nginx/body /run/nginx/proxy /run/nginx/fastcgi
+  : > "$ENV_EXPORT_FILE"
 
   if [ ! -f "$APP_DATA_DIR/config/config.json" ]; then
     log "Seeding default configuration"
@@ -55,6 +64,7 @@ configure_database() {
     db_url="postgresql://${db_url#postgres://}"
   fi
   export DATABASE_URL="$db_url"
+  record_env_var DATABASE_URL "$DATABASE_URL"
   log "Configured PostgreSQL endpoint"
 }
 
@@ -84,6 +94,13 @@ PY
   export REDIS_SERVER_USERNAME="$username"
   export REDIS_URL="$CLOUDRON_REDIS_URL"
   export REDIS_SERVER_URL="$CLOUDRON_REDIS_URL"
+  record_env_var REDIS_SERVER_HOST "$REDIS_SERVER_HOST"
+  record_env_var REDIS_SERVER_PORT "$REDIS_SERVER_PORT"
+  record_env_var REDIS_SERVER_PASSWORD "$REDIS_SERVER_PASSWORD"
+  record_env_var REDIS_SERVER_DATABASE "$REDIS_SERVER_DATABASE"
+  record_env_var REDIS_SERVER_USERNAME "$REDIS_SERVER_USERNAME"
+  record_env_var REDIS_URL "$REDIS_URL"
+  record_env_var REDIS_SERVER_URL "$REDIS_SERVER_URL"
   log "Configured Redis endpoint"
 }
 
@@ -98,6 +115,12 @@ configure_mail() {
   export MAILER_PASSWORD="${CLOUDRON_MAIL_SMTP_PASSWORD:-}"
   export MAILER_SENDER="${CLOUDRON_MAIL_FROM:-AFFiNE <no-reply@cloudron.local>}"
   export MAILER_SERVERNAME="${MAILER_SERVERNAME:-AFFiNE Server}"
+  record_env_var MAILER_HOST "$MAILER_HOST"
+  record_env_var MAILER_PORT "$MAILER_PORT"
+  record_env_var MAILER_USER "$MAILER_USER"
+  record_env_var MAILER_PASSWORD "$MAILER_PASSWORD"
+  record_env_var MAILER_SENDER "$MAILER_SENDER"
+  record_env_var MAILER_SERVERNAME "$MAILER_SERVERNAME"
   log "Configured SMTP relay"
 }
 
@@ -121,37 +144,10 @@ PY
     fi
   fi
   export AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
-}
-
-write_runtime_env() {
-  : > "$ENV_EXPORT_FILE"
-  local vars=(
-    DATABASE_URL
-    REDIS_SERVER_HOST
-    REDIS_SERVER_PORT
-    REDIS_SERVER_PASSWORD
-    REDIS_SERVER_DATABASE
-    REDIS_SERVER_USERNAME
-    REDIS_URL
-    REDIS_SERVER_URL
-    MAILER_HOST
-    MAILER_PORT
-    MAILER_USER
-    MAILER_PASSWORD
-    MAILER_SENDER
-    MAILER_SERVERNAME
-    AFFINE_SERVER_EXTERNAL_URL
-    AFFINE_SERVER_HOST
-    AFFINE_SERVER_HTTPS
-    AFFINE_INDEXER_ENABLED
-  )
-  local var value
-  for var in "${vars[@]}"; do
-    value=$(printenv "$var" 2>/dev/null || true)
-    if [ -n "$value" ]; then
-      printf '%s=%q\n' "$var" "$value" >> "$ENV_EXPORT_FILE"
-    fi
-  done
+  record_env_var AFFINE_SERVER_EXTERNAL_URL "${AFFINE_SERVER_EXTERNAL_URL:-}"
+  record_env_var AFFINE_SERVER_HOST "${AFFINE_SERVER_HOST:-}"
+  record_env_var AFFINE_SERVER_HTTPS "${AFFINE_SERVER_HTTPS:-}"
+  record_env_var AFFINE_INDEXER_ENABLED "$AFFINE_INDEXER_ENABLED"
 }
 
 configure_auth() {
@@ -205,7 +201,6 @@ main() {
   configure_server_metadata
   update_server_config
   configure_auth
-  write_runtime_env
   chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_HOME_DIR"
   log "Starting supervisor"
   exec /usr/bin/supervisord -c "$APP_CODE_DIR/supervisord.conf"
