@@ -18,6 +18,7 @@ RUN mkdir -p "$APP_CODE_DIR" "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_TMP_DIR" &
 
 # bring in the upstream runtime and packaged server artifacts
 COPY --from=upstream /usr/local /usr/local
+COPY --from=upstream /opt /opt
 COPY --from=upstream /app "$APP_BUILD_DIR"
 
 # configuration, launch scripts, and defaults

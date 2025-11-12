@@ -25,6 +25,7 @@ require_env() {
 prepare_data_dirs() {
   log "Preparing persistent directories"
   mkdir -p "$APP_DATA_DIR/config" "$APP_DATA_DIR/storage" "$APP_DATA_DIR/logs" "$APP_RUNTIME_DIR" "$APP_HOME_DIR" "$AFFINE_HOME"
+  mkdir -p /run/nginx/body /run/nginx/proxy /run/nginx/fastcgi
 
   if [ ! -f "$APP_DATA_DIR/config/config.json" ]; then
     log "Seeding default configuration"
