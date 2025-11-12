@@ -101,6 +101,20 @@ PY
   record_env_var REDIS_SERVER_USERNAME "$username"
   record_env_var REDIS_URL "$CLOUDRON_REDIS_URL"
   record_env_var REDIS_SERVER_URL "$CLOUDRON_REDIS_URL"
+  python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+config_path = Path(os.environ['APP_DATA_DIR']) / 'config' / 'config.json'
+data = json.loads(config_path.read_text())
+redis = data.setdefault('redis', {})
+redis['host'] = os.environ['REDIS_SERVER_HOST']
+redis['port'] = int(os.environ['REDIS_SERVER_PORT'])
+redis['password'] = os.environ['REDIS_SERVER_PASSWORD']
+redis['username'] = os.environ['REDIS_SERVER_USERNAME']
+redis['db'] = int(os.environ['REDIS_SERVER_DATABASE'])
+config_path.write_text(json.dumps(data, indent=2))
+PY
   log "Configured Redis endpoint"
 }
 
