@@ -108,11 +108,11 @@ from pathlib import Path
 config_path = Path(os.environ['APP_DATA_DIR']) / 'config' / 'config.json'
 data = json.loads(config_path.read_text())
 redis = data.setdefault('redis', {})
-redis['host'] = os.environ['REDIS_SERVER_HOST']
-redis['port'] = int(os.environ['REDIS_SERVER_PORT'])
-redis['password'] = os.environ['REDIS_SERVER_PASSWORD']
-redis['username'] = os.environ['REDIS_SERVER_USERNAME']
-redis['db'] = int(os.environ['REDIS_SERVER_DATABASE'])
+redis['host'] = os.environ.get('REDIS_SERVER_HOST', '')
+redis['port'] = int(os.environ.get('REDIS_SERVER_PORT') or 6379)
+redis['password'] = os.environ.get('REDIS_SERVER_PASSWORD', '')
+redis['username'] = os.environ.get('REDIS_SERVER_USERNAME', '')
+redis['db'] = int(os.environ.get('REDIS_SERVER_DATABASE') or 0)
 config_path.write_text(json.dumps(data, indent=2))
 PY
   log "Configured Redis endpoint"
