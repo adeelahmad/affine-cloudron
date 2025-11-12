@@ -99,6 +99,20 @@ print(f"{host}\n{port}\n{password}\n{db}\n{username}")
 PY
 )
   IFS=$'\n' read -r host port password db username <<<"$redis_info"
+  if [ -n "${CLOUDRON_REDIS_HOST:-}" ]; then
+    host="$CLOUDRON_REDIS_HOST"
+  fi
+  if [ -n "${CLOUDRON_REDIS_PORT:-}" ]; then
+    port="$CLOUDRON_REDIS_PORT"
+  fi
+  if [ -n "${CLOUDRON_REDIS_PASSWORD:-}" ]; then
+    password="$CLOUDRON_REDIS_PASSWORD"
+  fi
+  if [ -n "${CLOUDRON_REDIS_USERNAME:-}" ]; then
+    username="$CLOUDRON_REDIS_USERNAME"
+  elif [ -z "$username" ]; then
+    username="default"
+  fi
   export REDIS_SERVER_HOST="$host"
   export REDIS_SERVER_PORT="$port"
   export REDIS_SERVER_PASSWORD="$password"
