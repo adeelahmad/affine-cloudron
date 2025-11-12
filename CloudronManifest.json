@@ -1,0 +1,34 @@
+{
+  "id": "pro.affine.cloudron",
+  "title": "AFFiNE",
+  "author": "AFFiNE Project",
+  "description": "Next-gen knowledge base that blends docs, whiteboards, and databases for self-hosted teams.",
+  "website": "https://affine.pro",
+  "contactEmail": "support@affine.pro",
+  "version": "0.1.0",
+  "changelog": "Initial Cloudron packaging",
+  "manifestVersion": 2,
+  "minBoxVersion": "7.0.0",
+  "httpPort": 3000,
+  "addons": {
+    "localstorage": {},
+    "postgresql": {},
+    "redis": {},
+    "sendmail": {},
+    "oidc": {
+      "redirectUris": [
+        "/api/v1/session/callback"
+      ],
+      "loginRedirectUri": "/api/v1/session/callback"
+    }
+  },
+  "memoryLimit": 2147483648,
+  "healthCheckPath": "/api/healthz",
+  "tags": [
+    "notes",
+    "knowledge-base",
+    "whiteboard",
+    "collaboration"
+  ],
+  "postInstallMessage": "AFFiNE is connected to Cloudron single sign-on by default. Sign in with any Cloudron user to create your first workspace."
+}
