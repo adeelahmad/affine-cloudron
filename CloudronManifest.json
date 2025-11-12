@@ -5,7 +5,7 @@
   "description": "Next-gen knowledge base that blends docs, whiteboards, and databases for self-hosted teams.",
   "website": "https://affine.pro",
   "contactEmail": "support@affine.pro",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "changelog": "Initial Cloudron packaging",
   "manifestVersion": 2,
   "minBoxVersion": "7.0.0",

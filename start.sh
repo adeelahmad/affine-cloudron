@@ -127,20 +127,18 @@ PY
   record_env_var REDIS_SERVER_USERNAME "$username"
   record_env_var REDIS_URL "$CLOUDRON_REDIS_URL"
   record_env_var REDIS_SERVER_URL "$CLOUDRON_REDIS_URL"
-  python3 - <<'PY'
-import json
-import os
-from pathlib import Path
-config_path = Path(os.environ['APP_DATA_DIR']) / 'config' / 'config.json'
-data = json.loads(config_path.read_text())
-redis = data.setdefault('redis', {})
-redis['host'] = os.environ.get('REDIS_SERVER_HOST', '')
-redis['port'] = int(os.environ.get('REDIS_SERVER_PORT') or 6379)
-redis['password'] = os.environ.get('REDIS_SERVER_PASSWORD', '')
-redis['username'] = os.environ.get('REDIS_SERVER_USERNAME', '')
-redis['db'] = int(os.environ.get('REDIS_SERVER_DATABASE') or 0)
-config_path.write_text(json.dumps(data, indent=2))
-PY
+  jq --arg host "$host" \
+     --arg port "$port" \
+     --arg password "$password" \
+     --arg username "$username" \
+     --arg db "$db" \
+     '.redis.host = $host
+      | .redis.port = ($port|tonumber)
+      | .redis.password = $password
+      | .redis.username = $username
+      | .redis.db = ($db|tonumber)' \
+     "$APP_DATA_DIR/config/config.json" > "$APP_DATA_DIR/config/config.json.tmp"
+  mv "$APP_DATA_DIR/config/config.json.tmp" "$APP_DATA_DIR/config/config.json"
   log "Configured Redis endpoint"
 }
 
