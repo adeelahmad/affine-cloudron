@@ -1,4 +1,5 @@
-FROM ghcr.io/toeverything/affine:stable AS upstream
+ARG AFFINE_VERSION=stable
+FROM ghcr.io/toeverything/affine:${AFFINE_VERSION} AS upstream
 
 FROM cloudron/base:5.0.0
 
@@ -30,7 +31,8 @@ COPY config.example.json "$APP_CODE_DIR/config.example.json"
 COPY tmp_data/ "$APP_TMP_DIR/"
 
 RUN chmod +x "$APP_CODE_DIR/start.sh" "$APP_CODE_DIR/run-affine.sh" && \
-    chown -R cloudron:cloudron "$APP_CODE_DIR" "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_TMP_DIR"
+    chown cloudron:cloudron "$APP_CODE_DIR/start.sh" "$APP_CODE_DIR/run-affine.sh" && \
+    chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_TMP_DIR"
 
 EXPOSE 3000
 CMD ["/app/code/start.sh"]

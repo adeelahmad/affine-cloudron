@@ -99,9 +99,138 @@ ensure_runtime_envs() {
   ensure_server_env
 }
 
+patch_upload_limits() {
+  local target="$APP_DIR/dist/main.js"
+  if [ ! -f "$target" ]; then
+    return
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+target = Path(sys.argv[1])
+data = target.read_text()
+updated = data
+updated = updated.replace("limit: 100 * OneMB", "limit: 512 * OneMB", 1)
+updated = updated.replace("maxFileSize: 100 * OneMB", "maxFileSize: 512 * OneMB", 1)
+if updated != data:
+    target.write_text(updated)
+PY
+}
+
+grant_team_plan_features() {
+  log "Ensuring self-hosted workspaces have team plan features"
+  node <<'NODE'
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient();
+
+async function main() {
+  const feature = await prisma.feature.findFirst({
+    where: { name: 'team_plan_v1' },
+    orderBy: { deprecatedVersion: 'desc' },
+  });
+  if (!feature) {
+    console.warn('[team-plan] Feature record not found, skipping');
+    return;
+  }
+
+  const workspaces = await prisma.workspace.findMany({
+    select: { id: true },
+  });
+
+  for (const { id } of workspaces) {
+    const existing = await prisma.workspaceFeature.findFirst({
+      where: {
+        workspaceId: id,
+        name: 'team_plan_v1',
+        activated: true,
+      },
+    });
+    if (existing) continue;
+
+    await prisma.workspaceFeature.create({
+      data: {
+        workspaceId: id,
+        featureId: feature.id,
+        name: 'team_plan_v1',
+        type: feature.deprecatedType ?? 1,
+        configs: feature.configs,
+        reason: 'selfhost-default',
+        activated: true,
+      },
+    });
+    console.log(`[team-plan] Granted team plan to workspace ${id}`);
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE OR REPLACE FUNCTION grant_team_plan_feature()
+    RETURNS TRIGGER AS $$
+    DECLARE
+      feature_id integer;
+      feature_type integer;
+      feature_configs jsonb;
+    BEGIN
+      SELECT id, type, configs
+        INTO feature_id, feature_type, feature_configs
+      FROM features
+      WHERE feature = 'team_plan_v1'
+      ORDER BY version DESC
+      LIMIT 1;
+
+      IF feature_id IS NULL THEN
+        RETURN NEW;
+      END IF;
+
+      INSERT INTO workspace_features
+        (workspace_id, feature_id, name, type, configs, reason, activated, created_at)
+      SELECT
+        NEW.id,
+        feature_id,
+        'team_plan_v1',
+        feature_type,
+        feature_configs,
+        'selfhost-default',
+        TRUE,
+        NOW()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM workspace_features
+        WHERE workspace_id = NEW.id AND name = 'team_plan_v1' AND activated = TRUE
+      );
+
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    DO $$ BEGIN
+      CREATE TRIGGER grant_team_plan_feature_trigger
+      AFTER INSERT ON workspaces
+      FOR EACH ROW
+      EXECUTE FUNCTION grant_team_plan_feature();
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+}
+
+main()
+  .then(() => console.log('[team-plan] Workspace quota ensured'))
+  .catch(err => {
+    console.error('[team-plan] Failed to grant features', err);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
+NODE
+}
+
 log "Running AFFiNE pre-deployment migrations"
 ensure_runtime_envs
 node ./scripts/self-host-predeploy.js
+patch_upload_limits
+grant_team_plan_features
 
 log "Starting AFFiNE server"
 exec node ./dist/main.js
