@@ -34,7 +34,7 @@ require_env() {
 prepare_data_dirs() {
   log "Preparing persistent directories"
   mkdir -p "$APP_DATA_DIR/config" "$APP_DATA_DIR/storage" "$APP_DATA_DIR/logs" "$APP_RUNTIME_DIR" "$APP_HOME_DIR" "$AFFINE_HOME"
-  mkdir -p /run/nginx/body /run/nginx/proxy /run/nginx/fastcgi
+  mkdir -p /run/nginx/body /run/nginx/proxy /run/nginx/fastcgi /run/nginx/uwsgi /run/nginx/scgi
   : > "$ENV_EXPORT_FILE"
 
   if [ ! -f "$APP_DATA_DIR/config/config.json" ]; then
@@ -55,6 +55,19 @@ prepare_data_dirs() {
   ln -sf "$APP_DATA_DIR/storage" "$AFFINE_HOME/storage"
 
   chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_HOME_DIR"
+}
+
+prepare_runtime_build_dir() {
+  local source_dir="$APP_BUILD_DIR"
+  local runtime_build_dir="$APP_RUNTIME_DIR/affine-build"
+  log "Syncing AFFiNE runtime into $runtime_build_dir"
+  rm -rf "$runtime_build_dir"
+  mkdir -p "$runtime_build_dir"
+  cp -a "$source_dir/." "$runtime_build_dir/"
+  chown -R cloudron:cloudron "$runtime_build_dir"
+  APP_BUILD_DIR="$runtime_build_dir"
+  export APP_BUILD_DIR
+  record_env_var APP_BUILD_DIR "$APP_BUILD_DIR"
 }
 
 configure_database() {
@@ -145,22 +158,54 @@ PY
 }
 
 configure_mail() {
-  if [ -z "${CLOUDRON_MAIL_SMTP_SERVER:-}" ]; then
-    log "Cloudron mail addon not configured, skipping SMTP setup"
+  local host=""
+  local port=""
+  local user=""
+  local password=""
+  local sender=""
+  local ignore_tls="false"
+
+  if [ -n "${CLOUDRON_EMAIL_SMTP_SERVER:-}" ]; then
+    host="$CLOUDRON_EMAIL_SMTP_SERVER"
+    port="${CLOUDRON_EMAIL_SMTPS_PORT:-${CLOUDRON_EMAIL_SMTP_PORT:-587}}"
+    user="${CLOUDRON_EMAIL_SMTP_USERNAME:-}"
+    password="${CLOUDRON_EMAIL_SMTP_PASSWORD:-}"
+    sender="${CLOUDRON_EMAIL_FROM:-AFFiNE <no-reply@cloudron.local>}"
+    ignore_tls="${MAILER_IGNORE_TLS:-true}"
+    log "Configuring SMTP using Cloudron email addon"
+  elif [ -n "${CLOUDRON_MAIL_SMTP_SERVER:-}" ]; then
+    host="$CLOUDRON_MAIL_SMTP_SERVER"
+    port="${CLOUDRON_MAIL_SMTP_PORT:-587}"
+    user="${CLOUDRON_MAIL_SMTP_USERNAME:-}"
+    password="${CLOUDRON_MAIL_SMTP_PASSWORD:-}"
+    sender="${CLOUDRON_MAIL_FROM:-AFFiNE <no-reply@cloudron.local>}"
+    ignore_tls="${MAILER_IGNORE_TLS:-false}"
+    if [ -n "${CLOUDRON_MAIL_SMTP_SECURE:-}" ]; then
+      case "${CLOUDRON_MAIL_SMTP_SECURE,,}" in
+        true|1|yes) port="${CLOUDRON_MAIL_SMTP_PORT:-465}" ;;
+      esac
+    fi
+    log "Configuring SMTP using Cloudron sendmail addon"
+  else
+    log "Cloudron mail/email addon not configured, skipping SMTP setup"
     return
   fi
-  export MAILER_HOST="$CLOUDRON_MAIL_SMTP_SERVER"
-  export MAILER_PORT="${CLOUDRON_MAIL_SMTP_PORT:-587}"
-  export MAILER_USER="${CLOUDRON_MAIL_SMTP_USERNAME:-}"
-  export MAILER_PASSWORD="${CLOUDRON_MAIL_SMTP_PASSWORD:-}"
-  export MAILER_SENDER="${CLOUDRON_MAIL_FROM:-AFFiNE <no-reply@cloudron.local>}"
+
+  export MAILER_HOST="$host"
+  export MAILER_PORT="$port"
+  export MAILER_USER="$user"
+  export MAILER_PASSWORD="$password"
+  export MAILER_SENDER="${sender:-AFFiNE <no-reply@cloudron.local>}"
   export MAILER_SERVERNAME="${MAILER_SERVERNAME:-AFFiNE Server}"
+  export MAILER_IGNORE_TLS="$ignore_tls"
+
   record_env_var MAILER_HOST "$MAILER_HOST"
   record_env_var MAILER_PORT "$MAILER_PORT"
   record_env_var MAILER_USER "$MAILER_USER"
   record_env_var MAILER_PASSWORD "$MAILER_PASSWORD"
   record_env_var MAILER_SENDER "$MAILER_SENDER"
   record_env_var MAILER_SERVERNAME "$MAILER_SERVERNAME"
+  record_env_var MAILER_IGNORE_TLS "$MAILER_IGNORE_TLS"
   log "Configured SMTP relay"
 }
 
@@ -196,6 +241,7 @@ configure_auth() {
     python3 - <<'PY'
 import json
 import os
+import re
 from pathlib import Path
 config_path = Path(os.environ['APP_DATA_DIR']) / 'config' / 'config.json'
 data = json.loads(config_path.read_text())
@@ -204,9 +250,34 @@ providers = auth.setdefault('providers', {})
 oidc = providers.setdefault('oidc', {})
 oidc['clientId'] = os.environ.get('CLOUDRON_OIDC_CLIENT_ID', '')
 oidc['clientSecret'] = os.environ.get('CLOUDRON_OIDC_CLIENT_SECRET', '')
-oidc['issuer'] = os.environ.get('CLOUDRON_OIDC_ISSUER') or os.environ.get('CLOUDRON_OIDC_DISCOVERY_URL', '')
+issuer = os.environ.get('CLOUDRON_OIDC_ISSUER') or ''
+discovery = os.environ.get('CLOUDRON_OIDC_DISCOVERY_URL') or ''
+resolved_issuer = issuer
+if not resolved_issuer and discovery:
+    resolved_issuer = re.sub(r'/\.well-known.*$', '', discovery)
+if not resolved_issuer:
+    resolved_issuer = discovery
+oidc['issuer'] = resolved_issuer
+default_scope = os.environ.get('AFFINE_OIDC_SCOPE', 'openid profile email')
+default_claims = {
+    'claim_id': os.environ.get('AFFINE_OIDC_CLAIM_ID', 'preferred_username'),
+    'claim_email': os.environ.get('AFFINE_OIDC_CLAIM_EMAIL', 'email'),
+    'claim_name': os.environ.get('AFFINE_OIDC_CLAIM_NAME', 'name'),
+}
 args = oidc.setdefault('args', {})
-args.setdefault('scope', 'openid profile email')
+args['scope'] = default_scope
+for key, value in default_claims.items():
+    args.setdefault(key, value)
+oauth = data.setdefault('oauth', {})
+oauth_providers = oauth.setdefault('providers', {})
+oauth_oidc = oauth_providers.setdefault('oidc', {})
+oauth_oidc['clientId'] = oidc['clientId']
+oauth_oidc['clientSecret'] = oidc['clientSecret']
+oauth_oidc['issuer'] = resolved_issuer
+oauth_args = oauth_oidc.setdefault('args', {})
+oauth_args['scope'] = default_scope
+for key, value in default_claims.items():
+    oauth_args.setdefault(key, value)
 config_path.write_text(json.dumps(data, indent=2))
 PY
     log "Enabled Cloudron OIDC for AFFiNE"
@@ -235,6 +306,7 @@ PY
 main() {
   export HOME="$APP_HOME_DIR"
   prepare_data_dirs
+  prepare_runtime_build_dir
   configure_database
   configure_redis
   configure_mail
