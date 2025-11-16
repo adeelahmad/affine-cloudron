@@ -89,7 +89,9 @@ PY
   else
     export AFFINE_SERVER_HTTPS=false
   fi
-  export AFFINE_INDEXER_ENABLED="${AFFINE_INDEXER_ENABLED:-false}"
+  export AFFINE_INDEXER_ENABLED="${AFFINE_INDEXER_ENABLED:-true}"
+  export AFFINE_INDEXER_SEARCH_PROVIDER="${AFFINE_INDEXER_SEARCH_PROVIDER:-manticoresearch}"
+  export AFFINE_INDEXER_SEARCH_ENDPOINT="${AFFINE_INDEXER_SEARCH_ENDPOINT:-http://127.0.0.1:9308}"
 }
 
 ensure_runtime_envs() {
@@ -97,6 +99,45 @@ ensure_runtime_envs() {
   ensure_redis_env
   ensure_mail_env
   ensure_server_env
+}
+
+# Helper to parse indexer endpoint into host/port for readiness checks
+wait_for_indexer() {
+  if [ "${AFFINE_INDEXER_ENABLED:-false}" != "true" ]; then
+    return
+  fi
+  local endpoint="${AFFINE_INDEXER_SEARCH_ENDPOINT:-}"
+  if [ -z "$endpoint" ]; then
+    return
+  fi
+  log "Waiting for indexer endpoint ${endpoint}"
+  if python3 - "$endpoint" <<'PY'; then
+import socket
+import sys
+import time
+from urllib.parse import urlparse
+
+endpoint = sys.argv[1]
+if not endpoint.startswith(('http://', 'https://')):
+    endpoint = 'http://' + endpoint
+parsed = urlparse(endpoint)
+host = parsed.hostname
+port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+if not host or not port:
+    sys.exit(1)
+
+for _ in range(60):
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            sys.exit(0)
+    except OSError:
+        time.sleep(1)
+sys.exit(1)
+PY
+    log "Indexer is ready"
+  else
+    log "Indexer at ${endpoint} not reachable after waiting, continuing startup"
+  fi
 }
 
 patch_upload_limits() {
@@ -228,6 +269,7 @@ NODE
 
 log "Running AFFiNE pre-deployment migrations"
 ensure_runtime_envs
+wait_for_indexer
 node ./scripts/self-host-predeploy.js
 patch_upload_limits
 grant_team_plan_features

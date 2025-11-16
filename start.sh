@@ -9,7 +9,11 @@ APP_BUILD_DIR=${APP_BUILD_DIR:-/app/code/affine}
 APP_HOME_DIR=${APP_HOME_DIR:-/app/data/home}
 AFFINE_HOME=${AFFINE_HOME:-$APP_HOME_DIR/.affine}
 ENV_EXPORT_FILE=${ENV_EXPORT_FILE:-$APP_RUNTIME_DIR/runtime.env}
-export APP_CODE_DIR APP_DATA_DIR APP_RUNTIME_DIR APP_TMP_DIR APP_BUILD_DIR APP_HOME_DIR AFFINE_HOME ENV_EXPORT_FILE
+MANTICORE_DATA_DIR=${MANTICORE_DATA_DIR:-$APP_DATA_DIR/manticore}
+MANTICORE_CONFIG_FILE=${MANTICORE_CONFIG_FILE:-$MANTICORE_DATA_DIR/manticore.conf}
+MANTICORE_HTTP_ENDPOINT=${MANTICORE_HTTP_ENDPOINT:-http://127.0.0.1:9308}
+export APP_CODE_DIR APP_DATA_DIR APP_RUNTIME_DIR APP_TMP_DIR APP_BUILD_DIR APP_HOME_DIR AFFINE_HOME ENV_EXPORT_FILE \
+  MANTICORE_DATA_DIR MANTICORE_CONFIG_FILE MANTICORE_HTTP_ENDPOINT
 
 log() {
   printf '[%s] %s\n' "$(date --iso-8601=seconds)" "$*"
@@ -57,6 +61,33 @@ prepare_data_dirs() {
   chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_HOME_DIR"
 }
 
+prepare_manticore() {
+  log "Preparing Manticore data directory"
+  local buddy_plugins_dir="$MANTICORE_DATA_DIR/plugins/buddy-plugins"
+  mkdir -p "$MANTICORE_DATA_DIR"/{data,binlog,logs,buddy} "$buddy_plugins_dir"
+  cp "$APP_CODE_DIR/manticore/manticore.conf" "$MANTICORE_CONFIG_FILE"
+  local composer_file="$buddy_plugins_dir/composer.json"
+  if [ ! -f "$composer_file" ]; then
+    cat > "$composer_file" <<'JSON'
+{
+  "require": {},
+  "minimum-stability": "dev"
+}
+JSON
+  fi
+  local system_buddy_plugins="/usr/share/manticore/modules/manticore-buddy/buddy-plugins"
+  if [ ! -L "$system_buddy_plugins" ] && [ -w "/usr/share/manticore/modules/manticore-buddy" ]; then
+    rm -rf "$system_buddy_plugins"
+    ln -s "$buddy_plugins_dir" "$system_buddy_plugins"
+  elif [ ! -L "$system_buddy_plugins" ]; then
+    log "Buddy modules directory is read-only; skipping symlink to ${buddy_plugins_dir}"
+  fi
+  mkdir -p /run/manticore
+  chown -R cloudron:cloudron "$MANTICORE_DATA_DIR" /run/manticore
+  record_env_var MANTICORE_CONFIG_FILE "$MANTICORE_CONFIG_FILE"
+  record_env_var MANTICORE_HTTP_ENDPOINT "$MANTICORE_HTTP_ENDPOINT"
+}
+
 prepare_runtime_build_dir() {
   local source_dir="$APP_BUILD_DIR"
   local runtime_build_dir="$APP_RUNTIME_DIR/affine-build"
@@ -79,6 +110,23 @@ configure_database() {
   export DATABASE_URL="$db_url"
   record_env_var DATABASE_URL "$db_url"
   log "Configured PostgreSQL endpoint"
+}
+
+ensure_pgvector_extension() {
+  if [ -z "${DATABASE_URL:-}" ]; then
+    log "DATABASE_URL not set; skipping pgvector extension check"
+    return
+  fi
+  if ! command -v psql >/dev/null 2>&1; then
+    log "psql client unavailable; cannot verify pgvector extension"
+    return
+  fi
+  log "Ensuring pgvector extension exists"
+  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1; then
+    log "pgvector extension ready"
+  else
+    log "WARNING: Failed to create pgvector extension automatically. Ensure it exists for AI embeddings."
+  fi
 }
 
 configure_redis() {
@@ -228,11 +276,32 @@ PY
       export AFFINE_SERVER_HTTPS=false
     fi
   fi
-  export AFFINE_INDEXER_ENABLED=${AFFINE_INDEXER_ENABLED:-false}
   record_env_var AFFINE_SERVER_EXTERNAL_URL "${AFFINE_SERVER_EXTERNAL_URL:-}"
   record_env_var AFFINE_SERVER_HOST "${AFFINE_SERVER_HOST:-}"
   record_env_var AFFINE_SERVER_HTTPS "${AFFINE_SERVER_HTTPS:-}"
+}
+
+configure_indexer() {
+  export AFFINE_INDEXER_ENABLED=true
+  export AFFINE_INDEXER_SEARCH_PROVIDER=${AFFINE_INDEXER_SEARCH_PROVIDER:-manticoresearch}
+  export AFFINE_INDEXER_SEARCH_ENDPOINT=${AFFINE_INDEXER_SEARCH_ENDPOINT:-$MANTICORE_HTTP_ENDPOINT}
   record_env_var AFFINE_INDEXER_ENABLED "$AFFINE_INDEXER_ENABLED"
+  record_env_var AFFINE_INDEXER_SEARCH_PROVIDER "$AFFINE_INDEXER_SEARCH_PROVIDER"
+  record_env_var AFFINE_INDEXER_SEARCH_ENDPOINT "$AFFINE_INDEXER_SEARCH_ENDPOINT"
+
+  python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+config_path = Path(os.environ['APP_DATA_DIR']) / 'config' / 'config.json'
+data = json.loads(config_path.read_text())
+indexer = data.setdefault('indexer', {})
+indexer['enabled'] = True
+indexer['provider.type'] = os.environ.get('AFFINE_INDEXER_SEARCH_PROVIDER', 'manticoresearch')
+indexer['provider.endpoint'] = os.environ.get('AFFINE_INDEXER_SEARCH_ENDPOINT', 'http://127.0.0.1:9308')
+config_path.write_text(json.dumps(data, indent=2))
+PY
+  log "Configured indexer endpoint"
 }
 
 configure_auth() {
@@ -306,11 +375,14 @@ PY
 main() {
   export HOME="$APP_HOME_DIR"
   prepare_data_dirs
+  prepare_manticore
   prepare_runtime_build_dir
   configure_database
+  ensure_pgvector_extension
   configure_redis
   configure_mail
   configure_server_metadata
+  configure_indexer
   update_server_config
   configure_auth
   chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_HOME_DIR"
