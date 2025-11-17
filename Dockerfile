@@ -1,4 +1,4 @@
-ARG AFFINE_VERSION=stable
+ARG AFFINE_VERSION=0.25.5
 FROM ghcr.io/toeverything/affine:${AFFINE_VERSION} AS upstream
 
 FROM cloudron/base:5.0.0
