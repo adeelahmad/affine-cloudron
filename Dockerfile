@@ -14,7 +14,7 @@ ENV APP_CODE_DIR=/app/code \
 
 RUN mkdir -p "$APP_CODE_DIR" "$APP_DATA_DIR" "$APP_RUNTIME_DIR" "$APP_TMP_DIR" && \
     apt-get update && \
-    apt-get install -y --no-install-recommends jq python3 ca-certificates curl openssl libjemalloc2 postgresql-client && \
+    apt-get install -y --no-install-recommends jq python3 ca-certificates curl openssl libjemalloc2 postgresql-client mysql-client && \
     rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://repo.manticoresearch.com/GPG-KEY-manticore > /tmp/manticore.key && \

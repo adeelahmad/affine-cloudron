@@ -140,6 +140,29 @@ PY
   fi
 }
 
+seed_manticore_tables() {
+  local sql_dir="$APP_DIR/manticore"
+  if [ ! -d "$sql_dir" ]; then
+    return
+  fi
+  if ! command -v mysql >/dev/null 2>&1; then
+    log "mysql client not found; cannot seed Manticore tables"
+    return
+  fi
+  local mysql_cmd=(mysql -h 127.0.0.1 -P 9306)
+  for table in doc block; do
+    local sql_file="$sql_dir/${table}.sql"
+    if [ ! -f "$sql_file" ]; then
+      continue
+    fi
+    if "${mysql_cmd[@]}" < "$sql_file" >/dev/null 2>&1; then
+      log "Ensured Manticore table ${table}"
+    else
+      log "WARNING: Failed to apply ${sql_file} to Manticore"
+    fi
+  done
+}
+
 patch_upload_limits() {
   local target="$APP_DIR/dist/main.js"
   if [ ! -f "$target" ]; then
@@ -270,6 +293,7 @@ NODE
 log "Running AFFiNE pre-deployment migrations"
 ensure_runtime_envs
 wait_for_indexer
+seed_manticore_tables
 node ./scripts/self-host-predeploy.js
 patch_upload_limits
 grant_team_plan_features
