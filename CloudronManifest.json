@@ -11,6 +11,7 @@
   "manifestVersion": 2,
   "minBoxVersion": "7.0.0",
   "httpPort": 3000,
+  "configurePath": "/admin",
   "addons": {
     "localstorage": {},
     "postgresql": {},
