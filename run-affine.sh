@@ -141,8 +141,9 @@ PY
 }
 
 seed_manticore_tables() {
-  local sql_dir="$APP_DIR/manticore"
+  local sql_dir="${APP_CODE_DIR:-/app/code}/manticore"
   if [ ! -d "$sql_dir" ]; then
+    log "Manticore SQL directory ${sql_dir} missing; skipping table seed"
     return
   fi
   if ! command -v mysql >/dev/null 2>&1; then
