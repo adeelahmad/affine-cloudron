@@ -353,6 +353,86 @@ PY
   fi
 }
 
+configure_copilot_env_overrides() {
+  local config_path="$APP_DATA_DIR/config/config.json"
+  if [ ! -f "$config_path" ]; then
+    log "Copilot config file not found at ${config_path}, skipping env overrides"
+    return
+  fi
+  python3 - "$config_path" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = json.loads(path.read_text())
+copilot = data.setdefault('copilot', {})
+changed = False
+
+def set_nested(keys, value):
+    global changed
+    ref = copilot
+    for key in keys[:-1]:
+        ref = ref.setdefault(key, {})
+    if ref.get(keys[-1]) != value:
+        ref[keys[-1]] = value
+        print(f"[copilot] Set {'.'.join(keys)} from environment")
+        changed = True
+
+def coerce_bool(value):
+    if isinstance(value, bool):
+        return value
+    v = value.strip().lower()
+    if v in ('1', 'true', 'yes', 'on'):
+        return True
+    if v in ('0', 'false', 'no', 'off'):
+        return False
+    raise ValueError(f"Invalid boolean value: {value}")
+
+mapping = [
+    ('AFFINE_COPILOT_ENABLED', ('enabled',), coerce_bool),
+    ('AFFINE_COPILOT_OPENAI_API_KEY', ('providers.openai', 'apiKey'), str),
+    ('AFFINE_COPILOT_OPENAI_BASE_URL', ('providers.openai', 'baseURL'), str),
+    ('AFFINE_COPILOT_ANTHROPIC_API_KEY', ('providers.anthropic', 'apiKey'), str),
+    ('AFFINE_COPILOT_ANTHROPIC_BASE_URL', ('providers.anthropic', 'baseURL'), str),
+    ('AFFINE_COPILOT_GEMINI_API_KEY', ('providers.gemini', 'apiKey'), str),
+    ('AFFINE_COPILOT_GEMINI_BASE_URL', ('providers.gemini', 'baseURL'), str),
+    ('AFFINE_COPILOT_EXA_KEY', ('exa', 'key'), str),
+]
+
+for env_name, path_keys, caster in mapping:
+    value = os.environ.get(env_name)
+    if not value:
+        continue
+    try:
+        coerced = caster(value)
+    except Exception as exc:
+        print(f"[copilot] Skipping {env_name}: {exc}", flush=True)
+        continue
+    set_nested(path_keys, coerced)
+
+scenarios_json = os.environ.get('AFFINE_COPILOT_SCENARIOS_JSON')
+if scenarios_json:
+    try:
+        payload = json.loads(scenarios_json)
+        if not isinstance(payload, dict) or 'scenarios' not in payload:
+            raise ValueError("JSON must contain a 'scenarios' object")
+    except Exception as exc:
+        print(f"[copilot] Invalid AFFINE_COPILOT_SCENARIOS_JSON: {exc}", flush=True)
+    else:
+        copilot.setdefault('scenarios', {})
+        copilot['scenarios']['override_enabled'] = payload.get('override_enabled', True)
+        copilot['scenarios']['scenarios'] = payload['scenarios']
+        print("[copilot] Applied scenarios override from AFFINE_COPILOT_SCENARIOS_JSON")
+        changed = True
+
+if changed:
+    path.write_text(json.dumps(data, indent=2))
+PY
+  log "Applied copilot env configuration overrides (if any)"
+}
+
 update_server_config() {
   python3 - <<'PY'
 import json
@@ -385,6 +465,7 @@ main() {
   configure_indexer
   update_server_config
   configure_auth
+  configure_copilot_env_overrides
   chown -R cloudron:cloudron "$APP_DATA_DIR" "$APP_HOME_DIR"
   log "Starting supervisor"
   exec /usr/bin/supervisord -c "$APP_CODE_DIR/supervisord.conf"

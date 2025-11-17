@@ -42,3 +42,10 @@ cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron
 - Persistent config lives in `/app/data/config/config.json`. Modify values (e.g., Stripe, throttling) and restart the app; the file is backed up by Cloudron.
 - Uploaded files live in `/app/data/storage` and map to `~/.affine/storage` inside the runtime.
 - Default health check hits `/api/healthz`; customize via `CloudronManifest.json` if upstream changes.
+- Copilot providers can be configured with environment variables instead of editing `config.json`. Set any of the following via `cloudron env set --app affine.due.ren KEY=value` and restart:
+  - `AFFINE_COPILOT_ENABLED` (`true`/`false`)
+  - `AFFINE_COPILOT_OPENAI_API_KEY`, `AFFINE_COPILOT_OPENAI_BASE_URL`
+  - `AFFINE_COPILOT_ANTHROPIC_API_KEY`, `AFFINE_COPILOT_ANTHROPIC_BASE_URL`
+  - `AFFINE_COPILOT_GEMINI_API_KEY`, `AFFINE_COPILOT_GEMINI_BASE_URL`
+  - `AFFINE_COPILOT_EXA_KEY` for web search
+  - `AFFINE_COPILOT_SCENARIOS_JSON` with a JSON payload such as `{"override_enabled":true,"scenarios":{"chat":"gpt-4o-mini"}}`
