@@ -13,14 +13,14 @@ cloudron build \
   --set-build-service builder.docker.due.ren \
   --build-service-token e3265de06b1d0e7bb38400539012a8433a74c2c96a17955e \
   --set-repository andreasdueren/affine-cloudron \
-  --tag 0.25.5-5
+  --tag 0.25.5-6
 ```
 
 ## Deployment Steps
 1. Remove any previous dev install of AFFiNE on the Cloudron (always reinstall from scratch).
 2. Install the freshly built image:
    ```bash
-cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-5
+cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-6
    ```
 3. When prompted, confirm the app info and wait for Cloudron to report success (abort after ~30 seconds if installation stalls or errors to avoid hanging sessions).
 4. Visit `https://affine.due.ren` (or the chosen location) and sign in using Cloudron SSO.
@@ -42,11 +42,4 @@ cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron
 - Persistent config lives in `/app/data/config/config.json`. Modify values (e.g., Stripe, throttling) and restart the app; the file is backed up by Cloudron.
 - Uploaded files live in `/app/data/storage` and map to `~/.affine/storage` inside the runtime.
 - Default health check hits `/api/healthz`; customize via `CloudronManifest.json` if upstream changes.
-- Copilot providers can be configured with environment variables instead of editing `config.json`. Set any of the following via `cloudron env set --app affine.due.ren KEY=value` and restart:
-  - `AFFINE_COPILOT_ENABLED` (`true`/`false`)
-  - `AFFINE_COPILOT_OPENAI_API_KEY`, `AFFINE_COPILOT_OPENAI_BASE_URL`
-  - `AFFINE_COPILOT_ANTHROPIC_API_KEY`, `AFFINE_COPILOT_ANTHROPIC_BASE_URL`
-  - `AFFINE_COPILOT_GEMINI_API_KEY`, `AFFINE_COPILOT_GEMINI_BASE_URL`
-  - `AFFINE_COPILOT_EXA_KEY` for web search
-  - `AFFINE_COPILOT_SCENARIOS_JSON` with a JSON payload such as `{"override_enabled":true,"scenarios":{"chat":"gpt-4o-mini"}}`
-- A sample `.env` file is available at `/app/data/copilot.env.example` after install; download/edit it for reference before populating Cloudron env variables.
+- Copilot API keys live in `/app/data/config/config.json`. The default file contains placeholders (`sk-provide-openai-key-here`, etc.); open it in the Cloudron File Manager or via `cloudron exec` to paste your own values, then restart the app so AFFiNE picks up the changes.

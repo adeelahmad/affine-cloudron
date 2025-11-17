@@ -2,5 +2,38 @@
   "$schema": "https://github.com/toeverything/AFFiNE/releases/latest/download/config.schema.json",
   "server": {
     "name": "AFFiNE Self Hosted Server"
+  },
+  "copilot": {
+    "enabled": true,
+    "scenarios": {
+      "override_enabled": true,
+      "scenarios": {
+        "audio_transcribing": "gemini-2.5-flash",
+        "chat": "gemini-2.5-flash",
+        "embedding": "gemini-embedding-001",
+        "image": "gpt-image-1",
+        "rerank": "gpt-4.1",
+        "coding": "claude-sonnet-4-5@20250929",
+        "complex_text_generation": "gpt-4o-2024-08-06",
+        "quick_decision_making": "gpt-5-mini",
+        "quick_text_generation": "gemini-2.5-flash",
+        "polish_and_summarize": "gemini-2.5-flash"
+      }
+    },
+    "providers.openai": {
+      "apiKey": "sk-provide-openai-key-here",
+      "baseURL": "https://api.openai.com/v1"
+    },
+    "providers.anthropic": {
+      "apiKey": "sk-ant-provide-anthropic-key-here",
+      "baseURL": "https://api.anthropic.com/v1"
+    },
+    "providers.gemini": {
+      "apiKey": "provide-gemini-key-here",
+      "baseURL": "https://generativelanguage.googleapis.com/v1beta"
+    },
+    "exa": {
+      "key": "provide-exa-key-or-leave-empty"
+    }
   }
 }
