@@ -13,14 +13,14 @@ cloudron build \
   --set-build-service builder.docker.due.ren \
   --build-service-token e3265de06b1d0e7bb38400539012a8433a74c2c96a17955e \
   --set-repository andreasdueren/affine-cloudron \
-  --tag 0.25.5-3
+  --tag 0.25.5-4
 ```
 
 ## Deployment Steps
 1. Remove any previous dev install of AFFiNE on the Cloudron (always reinstall from scratch).
 2. Install the freshly built image:
    ```bash
-cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-3
+cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-4
    ```
 3. When prompted, confirm the app info and wait for Cloudron to report success (abort after ~30 seconds if installation stalls or errors to avoid hanging sessions).
 4. Visit `https://affine.due.ren` (or the chosen location) and sign in using Cloudron SSO.
