@@ -13,14 +13,14 @@ cloudron build \
   --set-build-service builder.docker.due.ren \
   --build-service-token e3265de06b1d0e7bb38400539012a8433a74c2c96a17955e \
   --set-repository andreasdueren/affine-cloudron \
-  --tag 0.25.5-1
+  --tag 0.25.5-2
 ```
 
 ## Deployment Steps
 1. Remove any previous dev install of AFFiNE on the Cloudron (always reinstall from scratch).
 2. Install the freshly built image:
    ```bash
-cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-1
+cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron:0.25.5-2
    ```
 3. When prompted, confirm the app info and wait for Cloudron to report success (abort after ~30 seconds if installation stalls or errors to avoid hanging sessions).
 4. Visit `https://affine.due.ren` (or the chosen location) and sign in using Cloudron SSO.
@@ -49,3 +49,4 @@ cloudron install --location affine.due.ren --image andreasdueren/affine-cloudron
   - `AFFINE_COPILOT_GEMINI_API_KEY`, `AFFINE_COPILOT_GEMINI_BASE_URL`
   - `AFFINE_COPILOT_EXA_KEY` for web search
   - `AFFINE_COPILOT_SCENARIOS_JSON` with a JSON payload such as `{"override_enabled":true,"scenarios":{"chat":"gpt-4o-mini"}}`
+- A sample `.env` file is available at `/app/data/copilot.env.example` after install; download/edit it for reference before populating Cloudron env variables.

@@ -46,6 +46,13 @@ prepare_data_dirs() {
     cp "$APP_TMP_DIR/config/config.json" "$APP_DATA_DIR/config/config.json"
   fi
 
+  local sample_env_src="$APP_CODE_DIR/copilot.env.example"
+  local sample_env_dest="$APP_DATA_DIR/copilot.env.example"
+  if [ -f "$sample_env_src" ] && [ ! -f "$sample_env_dest" ]; then
+    cp "$sample_env_src" "$sample_env_dest"
+    chown cloudron:cloudron "$sample_env_dest"
+  fi
+
   local storage_contents=""
   if [ -d "$APP_DATA_DIR/storage" ]; then
     storage_contents=$(ls -A "$APP_DATA_DIR/storage" 2>/dev/null || true)

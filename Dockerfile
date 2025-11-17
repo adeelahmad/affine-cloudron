@@ -42,6 +42,7 @@ COPY run-buddy.sh "$APP_CODE_DIR/run-buddy.sh"
 COPY nginx.conf "$APP_CODE_DIR/nginx.conf"
 COPY supervisord.conf "$APP_CODE_DIR/supervisord.conf"
 COPY config.example.json "$APP_CODE_DIR/config.example.json"
+COPY copilot.env.example "$APP_CODE_DIR/copilot.env.example"
 COPY tmp_data/ "$APP_TMP_DIR/"
 COPY manticore/ "$APP_CODE_DIR/manticore/"
 
