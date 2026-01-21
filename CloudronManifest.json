@@ -6,7 +6,7 @@
   "website": "https://affine.pro",
   "contactEmail": "support@affine.pro",
   "version": "0.25.5-6",
-  "upstreamVersion": "0.25.5",
+  "upstreamVersion": "0.25.5-6",
   "changelog": "Configure copilot via config.json placeholders; env overrides removed",
   "icon": "file://icon.png",
   "manifestVersion": 2,
